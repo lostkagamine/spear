@@ -1,0 +1,25 @@
+{
+  "name": "web-spear",
+  "version": "1.0.0",
+  "description": "a HTTP/1.0 server, written entirely in javascript",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ry00001/spear.git"
+  },
+  "keywords": [
+    "why",
+    "mistake",
+    "http",
+    "server"
+  ],
+  "author": "ry00001",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ry00001/spear/issues"
+  },
+  "homepage": "https://github.com/ry00001/spear#readme"
+}
