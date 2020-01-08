@@ -10,10 +10,11 @@ const fs = require('fs')
 const zlib = require('zlib')
 const ini = require('./ini')
 const config = ini.parse(fs.readFileSync('./config.ini').toString())
-const methodPathRegex = /(GET|POST|PUT|DELETE|OPTIONS) (.+) HTTP\/1.1/
+const methodPathRegex = /(GET|POST|PUT|DELETE|OPTIONS) (.+) HTTP\/(.+)/
 
 const TYPES_TO_DEFLATE = ['png', 'pdf']
 const PLAIN_TEXT = ['html', 'txt', 'css', 'js']
+const MAX_REQUEST_LENGTH = 512
 
 const filesDir = fs.readdirSync('files')
 const files = {}
@@ -37,6 +38,7 @@ const CONTENT_TYPES = {
 }
 
 const RESPONSE_PHRASES = {
+	"400": "Bad Request",
 	"404": "Not Found",
 	"200": "OK",
 	"500": "Internal Server Error",
@@ -62,12 +64,32 @@ function makeResponse(code, headers, body) {
 	return Buffer.concat([buf, body])
 }
 
+function finish400(s, message) {
+	let response = makeResponse('400', {'Content-Type': 'text/plain'}, Buffer.from(message));
+	console.log(response.toString())
+	s.write(response)
+	s.end()
+}
+
 const server = net.createServer(s => {
 	console.log('connection! client request follows.\n');
-	makePromise(s, 'data').then(reqbuf => {
-		var request = reqbuf.toString()
+	let buffers = [];
+	let tally = 0;
+	s.on('data', reqbuf => {
+		buffers.push(reqbuf)
+		tally += reqbuf.length
+		if (reqbuf.indexOf(10) == -1) {
+			if (tally > MAX_REQUEST_LENGTH) {
+				finish400(s, 'request length is above maximum')
+				buffers = []
+			}
+			return;
+		}
+		var request = Buffer.concat(buffers).toString()
+		buffers = []
 		var pathmatch = methodPathRegex.exec(request)
-		if (!pathmatch) throw new Error('bad HTTP request!')
+		if (!pathmatch)
+			finish400(s, 'request format is invalid')
 		var method = pathmatch[1]
 		var path = pathmatch[2]
 		if (path === '/error') throw new Error('induced by user')
@@ -93,7 +115,8 @@ const server = net.createServer(s => {
 		console.log(makeHeader('200', headers)+'data redacted');
 		s.write(response)
 		s.end()
-	}).catch(e => {
+	})
+	s.on('error', e => {
 		console.log(e)
 		var response = makeResponse('500', {'Content-Type': 'text/plain'}, e);
 		console.log(response)
